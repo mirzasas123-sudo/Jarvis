@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>J.A.R.V.I.S.</title>
+<style>
+  :root{
+    --cyan:#00e5ff;
+    --cyan-dim:#0a3d4d;
+    --bg:#020608;
+    --red:#ff2b45;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{
+    height:100%;
+    background:var(--bg);
+    color:var(--cyan);
+    font-family:'Consolas','Courier New',monospace;
+    overflow:hidden;
+  }
+  body{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    position:relative;
+  }
+  .bg-grid{
+    position:fixed;inset:0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.05) 1px, transparent 1px);
+    background-size:40px 40px;
+    animation:gridmove 20s linear infinite;
+    pointer-events:none;
+  }
+  @keyframes gridmove{
+    0%{background-position:0 0;}
+    100%{background-position:40px 40px;}
+  }
+  .scanline{
+    position:fixed;inset:0;
+    background:linear-gradient(to bottom, transparent 50%, rgba(0,229,255,0.02) 50%);
+    background-size:100% 4px;
+    pointer-events:none;
+    z-index:5;
+  }
+  #boot{
+    position:fixed;inset:0;
+    background:var(--bg);
+    z-index:100;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    padding:40px;
+    font-size:14px;
+    line-height:1.8;
+    white-space:pre-wrap;
+  }
+  #boot .cursor{
+    display:inline-block;
+    width:8px;height:14px;
+    background:var(--cyan);
+    animation:blink 0.8s steps(1) infinite;
+    vertical-align:middle;
+  }
+  @keyframes blink{50%{opacity:0;}}
+
+  #main{
+    display:none;
+    width:100%;
+    height:100%;
+    align-items:center;
+    justify-content:center;
+    flex-direction:column;
+    position:relative;
+    z-index:2;
+  }
+  .core-wrap{
+    position:relative;
+    width:min(70vw,320px);
+    height:min(70vw,320px);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .ring{
+    position:absolute;
+    border-radius:50%;
+    border:1px solid var(--cyan-dim);
+  }
+  .ring1{width:100%;height:100%;border-color:rgba(0,229,255,0.25);animation:spin 12s linear infinite;}
+  .ring2{width:78%;height:78%;border-style:dashed;border-color:rgba(0,229,255,0.35);animation:spin 9s linear infinite reverse;}
+  .ring3{width:56%;height:56%;border-color:rgba(0,229,255,0.5);animation:spin 6s linear infinite;}
+  @keyframes spin{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+
+  .core{
+    width:34%;height:34%;
+    border-radius:50%;
+    background:radial-gradient(circle at 40% 35%, #baf7ff, var(--cyan) 40%, #003844 90%);
+    box-shadow:0 0 30px 6px rgba(0,229,255,0.6), 0 0 80px 20px rgba(0,229,255,0.25);
+    animation:pulse 2.2s ease-in-out infinite;
+    transition:box-shadow .2s, transform .2s;
+  }
+  .core.listening{
+    animation:pulseFast 0.6s ease-in-out infinite;
+    box-shadow:0 0 45px 10px rgba(255,43,69,0.7), 0 0 100px 30px rgba(255,43,69,0.3);
+    background:radial-gradient(circle at 40% 35%, #ffd9dd, var(--red) 40%, #4a0009 90%);
+  }
+  @keyframes pulse{
+    0%,100%{transform:scale(1);}
+    50%{transform:scale(1.08);}
+  }
+  @keyframes pulseFast{
+    0%,100%{transform:scale(1);}
+    50%{transform:scale(1.18);}
+  }
+
+  #statusLine{
+    margin-top:28px;
+    font-size:13px;
+    letter-spacing:2px;
+    color:var(--cyan);
+    text-shadow:0 0 8px rgba(0,229,255,0.8);
+    min-height:20px;
+    text-align:center;
+  }
+  #transcript{
+    margin-top:10px;
+    font-size:15px;
+    max-width:80vw;
+    text-align:center;
+    min-height:24px;
+    color:#eafffe;
+  }
+
+  #topbar{
+    position:fixed;top:0;left:0;right:0;
+    display:flex;justify-content:space-between;
+    padding:14px 20px;
+    font-size:11px;
+    letter-spacing:1px;
+    color:var(--cyan-dim);
+    z-index:3;
+  }
+  #topbar span{color:var(--cyan);}
+
+  #netStatus{
+    position:fixed;bottom:0;left:0;right:0;
+    padding:10px 20px;
+    font-size:10px;
+    letter-spacing:1px;
+    color:rgba(0,229,255,0.55);
+    display:flex;justify-content:space-between;
+    z-index:3;
+  }
+
+  #micBtn{
+    margin-top:34px;
+    background:transparent;
+    border:1px solid var(--cyan);
+    color:var(--cyan);
+    padding:10px 26px;
+    font-family:inherit;
+    letter-spacing:2px;
+    font-size:12px;
+    border-radius:2px;
+    cursor:pointer;
+    text-shadow:0 0 6px rgba(0,229,255,0.7);
+    transition:all .2s;
+  }
+  #micBtn:hover{
+    background:rgba(0,229,255,0.1);
+    box-shadow:0 0 15px rgba(0,229,255,0.4);
+  }
+  #micBtn.active{
+    border-color:var(--red);
+    color:var(--red);
+    text-shadow:0 0 6px rgba(255,43,69,0.8);
+  }
+  #btnRow{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;}
+  #btBtn{
+    margin-top:34px;
+    background:transparent;
+    border:1px solid var(--cyan);
+    color:var(--cyan);
+    padding:10px 26px;
+    font-family:inherit;
+    letter-spacing:2px;
+    font-size:12px;
+    border-radius:2px;
+    cursor:pointer;
+    text-shadow:0 0 6px rgba(0,229,255,0.7);
+    transition:all .2s;
+  }
+  #btBtn:hover{
+    background:rgba(0,229,255,0.1);
+    box-shadow:0 0 15px rgba(0,229,255,0.4);
+  }
+  #btBtn.connected{
+    border-color:#39ff8f;
+    color:#39ff8f;
+    text-shadow:0 0 6px rgba(57,255,143,0.8);
+  }
+  #btMsg{
+    margin-top:14px;
+    font-size:11px;
+    letter-spacing:1px;
+    max-width:82vw;
+    text-align:center;
+    color:rgba(0,229,255,0.7);
+    min-height:16px;
+  }
+
+  ::selection{background:var(--cyan);color:#000;}
+</style>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+<div class="scanline"></div>
+
+<div id="boot"></div>
+
+<div id="topbar">
+  <div>J.A.R.V.I.S <span id="clock">--:--:--</span></div>
+  <div style="display:flex;align-items:center;gap:14px;">
+    <span>DURUM: <span id="topState">BEKLEMEDE</span></span>
+    <button id="settingsBtn" style="background:transparent;border:1px solid var(--cyan-dim);color:var(--cyan);font-family:inherit;font-size:10px;letter-spacing:1px;padding:4px 8px;border-radius:2px;cursor:pointer;">⚙ API</button>
+  </div>
+</div>
+
+<div id="settingsPanel" style="display:none;position:fixed;top:44px;right:14px;z-index:50;background:#02080a;border:1px solid var(--cyan-dim);padding:14px;width:min(80vw,300px);border-radius:4px;box-shadow:0 0 20px rgba(0,229,255,0.15);">
+  <div style="font-size:11px;letter-spacing:1px;margin-bottom:8px;">GEMINI API ANAHTARI</div>
+  <input id="apiKeyInput" type="password" placeholder="AIza..." style="width:100%;background:#000;border:1px solid var(--cyan-dim);color:var(--cyan);padding:8px;font-family:inherit;font-size:12px;border-radius:2px;">
+  <div style="display:flex;gap:8px;margin-top:10px;">
+    <button id="apiKeySave" style="flex:1;background:transparent;border:1px solid var(--cyan);color:var(--cyan);padding:8px;font-family:inherit;font-size:11px;letter-spacing:1px;border-radius:2px;cursor:pointer;">KAYDET</button>
+    <button id="apiKeyClear" style="flex:1;background:transparent;border:1px solid var(--red);color:var(--red);padding:8px;font-family:inherit;font-size:11px;letter-spacing:1px;border-radius:2px;cursor:pointer;">SİL</button>
+  </div>
+  <div id="apiKeyStatus" style="font-size:10px;margin-top:8px;color:rgba(0,229,255,0.6);"></div>
+  <div style="font-size:9px;margin-top:8px;color:rgba(0,229,255,0.4);line-height:1.4;">Anahtar sadece bu tarayıcıda (localStorage) saklanır, hiçbir sunucuya gönderilmez. Anahtar almak için: aistudio.google.com/apikey</div>
+</div>
+
+<div id="main">
+  <div class="core-wrap">
+    <div class="ring ring1"></div>
+    <div class="ring ring2"></div>
+    <div class="ring ring3"></div>
+    <div class="core" id="core"></div>
+  </div>
+  <div id="statusLine">DİNLEMEYE HAZIR</div>
+  <div id="transcript"></div>
+  <div id="btnRow">
+    <button id="micBtn">🎙 DİNLE</button>
+    <button id="btBtn">📶 BLUETOOTH BAĞLAN</button>
+  </div>
+  <div id="btMsg"></div>
+</div>
+
+<div id="netStatus">
+  <div>AĞ: <span id="netName">STARKNET // YEREL DÜĞÜM</span></div>
+  <div id="uptime">ÇALIŞMA SÜRESİ: 00:00:00</div>
+</div>
+
+<script>
+window.addEventListener('error', function(e){
+  const b = document.getElementById('boot');
+  if(b && b.style.display !== 'none'){
+    b.innerHTML += '\n[HATA] ' + (e.message || 'bilinmeyen hata');
+  }
+});
+
+/* ---------- Boot / fake StarkNet connection sequence ---------- */
+const bootLines = [
+  "J.A.R.V.I.S. ÇEKİRDEK SİSTEMİ BAŞLATILIYOR...",
+  "DONANIM ARAYÜZÜ KONTROL EDİLİYOR......... [TAMAM]",
+  "SES TANIMA MODÜLÜ YÜKLENİYOR............. [TAMAM]",
+  "YEREL ÇEKİRDEK ZEKA MOTORU HAZIRLANIYOR... [TAMAM]",
+  "GÜVENLİ AĞ TARANIYOR...",
+  "  > 'STARKNET' DÜĞÜMÜ BULUNDU",
+  "  > EL SIKIŞMA (HANDSHAKE) GERÇEKLEŞTİRİLİYOR...",
+  "  > ŞİFRELİ TÜNEL KURULUYOR [AES-256]......",
+  "  > BAĞLANTI DOĞRULANDI: STARKNET // YEREL DÜĞÜM",
+  "TÜM SİSTEMLER ÇEVRİMİÇİ.",
+  "",
+  "Merhaba efendim. Sistem hazır."
+];
+
+const bootEl = document.getElementById('boot');
+let bootStr = "";
+
+function typeLine(i){
+  if(i >= bootLines.length){
+    setTimeout(()=>{
+      bootEl.style.display='none';
+      document.getElementById('main').style.display='flex';
+      speak("Sistem hazır efendim.");
+    }, 500);
+    return;
+  }
+  const line = bootLines[i];
+  let c = 0;
+  const iv = setInterval(()=>{
+    bootStr += line[c] || "";
+    bootEl.innerHTML = bootStr + '<span class="cursor"></span>';
+    c++;
+    if(c > line.length){
+      clearInterval(iv);
+      bootStr += "\n";
+      setTimeout(()=>typeLine(i+1), line.startsWith("  >") ? 180 : 90);
+    }
+  }, 12);
+}
+typeLine(0);
+
+/* ---------- Clock / uptime ---------- */
+const startTime = Date.now();
+function pad(n){return n.toString().padStart(2,'0');}
+function updateClock(){
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  const up = Math.floor((Date.now()-startTime)/1000);
+  const h = Math.floor(up/3600), m = Math.floor((up%3600)/60), s = up%60;
+  document.getElementById('uptime').textContent =
+    `ÇALIŞMA SÜRESİ: ${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+/* ---------- Local (no external API) command engine ---------- */
+const core = document.getElementById('core');
+const statusLine = document.getElementById('statusLine');
+const transcriptEl = document.getElementById('transcript');
+const topState = document.getElementById('topState');
+const micBtn = document.getElementById('micBtn');
+
+function setState(txt){
+  topState.textContent = txt;
+}
+
+function speak(text){
+  transcriptEl.textContent = text;
+  try{
+    if('speechSynthesis' in window){
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'tr-TR';
+      u.rate = 1.0;
+      u.pitch = 0.85;
+      window.speechSynthesis.speak(u);
+    }
+  }catch(err){ /* konuşma sentezi bu ortamda desteklenmiyor olabilir, sessizce geç */ }
+}
+
+/* ---------- Gemini API key management ---------- */
+const settingsBtn = document.getElementById('settingsBtn');
+const settingsPanel = document.getElementById('settingsPanel');
+const apiKeyInput = document.getElementById('apiKeyInput');
+const apiKeySave = document.getElementById('apiKeySave');
+const apiKeyClear = document.getElementById('apiKeyClear');
+const apiKeyStatus = document.getElementById('apiKeyStatus');
+
+function getApiKey(){
+  try{ return localStorage.getItem('jarvis_gemini_key') || ""; }catch(err){ return ""; }
+}
+function refreshKeyStatus(){
+  const k = getApiKey();
+  apiKeyStatus.textContent = k ? ('Kayıtlı anahtar: ...' + k.slice(-6)) : 'Anahtar kayıtlı değil.';
+}
+refreshKeyStatus();
+
+settingsBtn.addEventListener('click', ()=>{
+  settingsPanel.style.display = settingsPanel.style.display === 'none' ? 'block' : 'none';
+});
+apiKeySave.addEventListener('click', ()=>{
+  const v = apiKeyInput.value.trim();
+  if(!v){ apiKeyStatus.textContent = 'Boş anahtar kaydedilemez.'; return; }
+  try{
+    localStorage.setItem('jarvis_gemini_key', v);
+    apiKeyInput.value = '';
+    refreshKeyStatus();
+    apiKeyStatus.textContent = 'Kaydedildi.';
+  }catch(err){
+    apiKeyStatus.textContent = 'Kaydedilemedi: ' + err.message;
+  }
+});
+apiKeyClear.addEventListener('click', ()=>{
+  try{ localStorage.removeItem('jarvis_gemini_key'); }catch(err){}
+  refreshKeyStatus();
+  apiKeyStatus.textContent = 'Anahtar silindi.';
+});
+
+async function askGemini(userText, attempt){
+  attempt = attempt || 1;
+  const key = getApiKey();
+  const isAuthKey = key.startsWith('AQ.');
+  const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent' + (isAuthKey ? '' : ('?key=' + encodeURIComponent(key)));
+  const headers = { 'Content-Type': 'application/json' };
+  if(isAuthKey){
+    headers['Authorization'] = 'Bearer ' + key;
+  }
+  const body = {
+    contents: [{ role: 'user', parts: [{ text: userText }] }],
+    systemInstruction: {
+      parts: [{ text: 'Sen J.A.R.V.I.S adında, Türkçe konuşan, kısa ve net cevaplar veren kişisel bir yapay zeka asistanısın. Kullanıcıya "efendim" diye hitap edersin. Cevapların sesli okunacak, bu yüzden kısa ve doğal cümleler kur, madde işareti veya markdown kullanma.' }]
+    }
+  };
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify(body)
+  });
+  if(res.status === 503 && attempt < 4){
+    statusLine.textContent = 'MODEL YOĞUN, TEKRAR DENENİYOR (' + attempt + '/3)...';
+    await new Promise(r=>setTimeout(r, 1500 * attempt));
+    return askGemini(userText, attempt + 1);
+  }
+  if(!res.ok){
+    const errText = await res.text().catch(()=> '');
+    throw new Error('API ' + res.status + ': ' + errText.slice(0,200));
+  }
+  const data = await res.json();
+  const candidate = data && data.candidates && data.candidates[0];
+  const text = candidate && candidate.content && candidate.content.parts && candidate.content.parts.map(p=>p.text||'').join('');
+  if(!text) throw new Error('Boş yanıt döndü.');
+  return text.trim();
+}
+
+function handleCommand(cmd){
+  const c = cmd.toLowerCase();
+  const key = getApiKey();
+
+  if(c.trim() === ""){
+    speak("Sizi duyamadım, tekrar eder misiniz?");
+    statusLine.textContent = 'DİNLEMEYE HAZIR';
+    setState('BEKLEMEDE');
+    return;
+  }
+
+  if(!key){
+    speak("Gemini API anahtarı kayıtlı değil. Lütfen sağ üstteki ayarlar butonundan anahtarınızı ekleyin efendim.");
+    statusLine.textContent = 'DİNLEMEYE HAZIR';
+    setState('BEKLEMEDE');
+    return;
+  }
+
+  statusLine.textContent = 'GEMİNİ İLE İŞLENİYOR...';
+  askGemini(cmd).then(reply=>{
+    speak(reply);
+    statusLine.textContent = 'DİNLEMEYE HAZIR';
+    setState('BEKLEMEDE');
+  }).catch(err=>{
+    statusLine.textContent = 'GEMİNİ HATASI';
+    setState('HATA');
+    speak("Gemini isteğinde bir hata oluştu efendim: " + err.message);
+  });
+}
+
+/* ---------- Speech recognition (browser-native, no external API) ---------- */
+let recognition = null;
+let listening = false;
+let SR = null;
+try{
+  SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}catch(err){ SR = null; }
+
+if(SR){
+ try{
+  recognition = new SR();
+  recognition.lang = 'tr-TR';
+  recognition.continuous = false;
+  recognition.interimResults = true;
+
+  recognition.onstart = ()=>{
+    listening = true;
+    core.classList.add('listening');
+    micBtn.classList.add('active');
+    micBtn.textContent = '■ DURDUR';
+    statusLine.textContent = 'DİNLENİYOR...';
+    setState('DİNLİYOR');
+  };
+
+  recognition.onresult = (e)=>{
+    let text = "";
+    for(let i=0;i<e.results.length;i++){
+      text += e.results[i][0].transcript;
+    }
+    transcriptEl.textContent = text;
+  };
+
+  recognition.onend = ()=>{
+    listening = false;
+    core.classList.remove('listening');
+    micBtn.classList.remove('active');
+    micBtn.textContent = '🎙 DİNLE';
+    setState('İŞLENİYOR');
+    const finalText = transcriptEl.textContent;
+    handleCommand(finalText);
+  };
+
+  recognition.onerror = (e)=>{
+    const code = e && e.error ? e.error : 'bilinmeyen';
+    let human = code;
+    if(code === 'not-allowed' || code === 'permission-denied') human = 'İZİN VERİLMEDİ (mikrofon izni reddedildi)';
+    else if(code === 'no-speech') human = 'SES ALGILANAMADI';
+    else if(code === 'audio-capture') human = 'MİKROFON BULUNAMADI';
+    else if(code === 'network') human = 'AĞ HATASI (ses tanıma servisine ulaşılamadı)';
+    else if(code === 'aborted') human = 'İPTAL EDİLDİ';
+    statusLine.textContent = 'HATA: ' + human;
+    setState('HATA');
+    listening = false;
+    core.classList.remove('listening');
+    micBtn.classList.remove('active');
+    micBtn.textContent = '🎙 DİNLE';
+  };
+ }catch(err){
+   recognition = null;
+   statusLine.textContent = 'SES TANIMA BAŞLATILAMADI';
+ }
+}else{
+  statusLine.textContent = 'BU TARAYICI SES TANIMAYI DESTEKLEMİYOR';
+}
+
+/* ---------- Web Bluetooth (real device pairing) ---------- */
+const btBtn = document.getElementById('btBtn');
+const btMsg = document.getElementById('btMsg');
+const netNameEl = document.getElementById('netName');
+let btDevice = null;
+
+function btShow(msg){
+  btMsg.textContent = msg;
+}
+
+if(!window.isSecureContext){
+  btShow('UYARI: Bluetooth için sayfanın HTTPS üzerinden açılması gerekir (dosyayı doğrudan açmak yetersiz).');
+}
+
+btBtn.addEventListener('click', async ()=>{
+  if(!navigator.bluetooth){
+    btShow('Bu tarayıcı Web Bluetooth desteklemiyor. (iOS Safari desteklemez — Android/Bilgisayarda Chrome veya Edge kullanın, sayfa HTTPS üzerinden açılmalı.)');
+    return;
+  }
+  if(!window.isSecureContext){
+    btShow('Bluetooth sadece HTTPS (güvenli) bağlantıda çalışır. Dosyayı bir web sunucusuna koyup öyle açın.');
+    return;
+  }
+  try{
+    btShow('Cihaz aranıyor... (tarayıcı cihaz seçim penceresini açacak)');
+    btDevice = await navigator.bluetooth.requestDevice({
+      acceptAllDevices: true,
+      optionalServices: ['battery_service','device_information']
+    });
+    btShow('Bağlanıyor: ' + btDevice.name + ' ...');
+    const server = await btDevice.gatt.connect();
+    btBtn.classList.add('connected');
+    btBtn.textContent = '📶 BAĞLANDI: ' + (btDevice.name || 'BİLİNMEYEN CİHAZ');
+    netNameEl.textContent = 'STARKNET // ' + (btDevice.name || 'BT-CİHAZ').toUpperCase();
+    btShow('Bluetooth bağlantısı kuruldu.');
+    speak('Bluetooth cihazına bağlanıldı efendim.');
+
+    btDevice.addEventListener('gattserverdisconnected', ()=>{
+      btBtn.classList.remove('connected');
+      btBtn.textContent = '📶 BLUETOOTH BAĞLAN';
+      netNameEl.textContent = 'STARKNET // YEREL DÜĞÜM';
+      btShow('Bağlantı kesildi.');
+    });
+  }catch(err){
+    if(err && err.name === 'NotFoundError'){
+      btShow('Cihaz seçilmedi veya bulunamadı.');
+    }else{
+      btShow('Bluetooth hatası: ' + (err && err.message ? err.message : String(err)));
+    }
+  }
+});
+
+micBtn.addEventListener('click', ()=>{
+  if(!recognition){
+    statusLine.textContent = 'SES TANIMA BU ORTAMDA KULLANILAMIYOR';
+    return;
+  }
+  try{
+    if(listening){
+      recognition.stop();
+    }else{
+      transcriptEl.textContent = "";
+      recognition.start();
+    }
+  }catch(err){
+    statusLine.textContent = 'MİKROFON HATASI: İZİN VERİLMEDİ Mİ?';
+  }
+});
+</script>
+</body>
+</html>
